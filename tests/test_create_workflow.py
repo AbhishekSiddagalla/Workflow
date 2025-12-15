@@ -15,14 +15,6 @@ class TestCreateWorkflowPOST:
         self.url = reverse("all-workflows")
 
     def test_successful_workflow_creation(self, test_user, valid_workflow_payload):
-        """
-        Scenario: Valid payload with multiple nodes and button mappings.
-        Expectation:
-        - Workflow created
-        - Templates created
-        - WorkflowMappings created
-        - Root template set
-        """
         response = self.client.post(
             self.url,
             data=json.dumps(valid_workflow_payload),
@@ -37,23 +29,13 @@ class TestCreateWorkflowPOST:
         assert workflow.workflow_name == valid_workflow_payload["workflow_name"]
         assert workflow.status == "pending"
 
-        # Templates created
         assert Templates.objects.filter(workflow=workflow).count() == len(valid_workflow_payload["nodes"])
 
-        # Mappings
         assert WorkflowMapping.objects.filter(workflow=workflow).count() == len(valid_workflow_payload["nodes"])
 
-        # Root template assigned
         assert workflow.root_template_id != 0
 
     def test_empty_nodes_payload(self, empty_payload):
-        """
-        Scenario: No nodes passed.
-        Expectation:
-        - Workflow created
-        - No templates or mappings created
-        - Root template remains 0
-        """
         response = self.client.post(
             self.url,
             data=json.dumps(empty_payload),
@@ -70,14 +52,6 @@ class TestCreateWorkflowPOST:
         assert workflow.root_template_id == 0
 
     def test_missing_target_node_mapping(self, missing_target_payload):
-        """
-        Scenario: Node has a next_node_client_id that does not exist.
-        Expectation:
-        - Workflow created normally
-        - No error raised
-        - Mapping created without parent mapping
-        - Mapping marked as root because no parent exists
-        """
         response = self.client.post(
             self.url,
             data=json.dumps(missing_target_payload),
@@ -97,12 +71,6 @@ class TestCreateWorkflowPOST:
         assert mapping.is_root is True
 
     def test_malformed_payload(self, malformed_payload):
-        """
-        Scenario: Wrong datatypes for fields → serializer should reject.
-        Expectation:
-        - Response is 400
-        - Error message returned
-        """
         response = self.client.post(
             self.url,
             data=json.dumps(malformed_payload),
@@ -116,9 +84,6 @@ class TestCreateWorkflowPOST:
         assert "details" in res
 
     def test_template_and_mapping_creation_logic(self, test_user):
-        """
-        Scenario: Verify templates + mapping creation in detail.
-        """
         payload = {
             "workflow_name": "WF_Test",
             "nodes": [
@@ -154,11 +119,6 @@ class TestCreateWorkflowPOST:
         assert mapping.is_root is True
 
     def test_parent_child_mapping_assignment(self):
-        """
-        Scenario:
-        n1 -> (button) -> n2
-        Expect n2.parent_mapping == n1.mapping
-        """
         payload = {
             "workflow_name": "WF_ParentChild",
             "nodes": [
