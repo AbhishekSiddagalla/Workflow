@@ -1,4 +1,4 @@
-api_access_token = "EAAV4VS5BZBc0BQGM5ZAHxxWNNiPQIzexDoma4m6gNZB7Hplk33KRYypnqBIRwMvvCYtFpauF1jIFi9g61AAP6YTzqMb1DY8YnGAZBO44ZCzoaxCohZANwR8P33iPqrw7dlRVEHESQVShxZAJRCiSvBZBjZBKFqx2XJihVUAFqVZBNuYulLLsi6VIDv7zyMWVCNZCpXERAUGkxMQN9SsplzQns4HJ3DjBnepvMoJGJ9hZCsA3QJgd1iZCkg3TjoEm8U38h2NkvZBQmEfngdwycSBktpvwlj"
+api_access_token = ""
 
 api_version = "v22.0"
 
