@@ -10,7 +10,8 @@ import {
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import CustomNode from "./CustomNode";
-import axiosInstance from "./axiosInstance";
+import { fetchTemplates, saveWorkflow } from "../api/workflowApi";
+// import axiosInstance from "./axiosInstance";
 
 const nodeTypes = {
   customNode: CustomNode,
@@ -29,12 +30,15 @@ export default function WorkflowEditor() {
   const [workflowName, setWorkflowName] = useState("");
 
   useEffect(() => {
-    axiosInstance
-      .get("/api/templates/")
-      .then((res) => {
-        setTemplateList(res.data.templates);
-      })
-      .catch((err) => console.log("Error Fetching Templates:", err));
+    const loadTemplates = async () => {
+      try {
+        const data = await fetchTemplates();
+        setTemplateList(data.templates);
+      } catch (error) {
+        console.error("Error Fetching Templates:", error);
+      }
+    };
+    loadTemplates();
   }, []);
 
   const getOutgoingTargets = (nodeId) => {
@@ -316,8 +320,16 @@ export default function WorkflowEditor() {
     };
 
     try {
-      const res = await axiosInstance.post("/api/workflows/", payload);
+      await saveWorkflow(payload);
       alert("workflow saved");
+
+      // clear form
+      setWorkflowName("");
+      setNodes([]);
+      setEdges([]);
+      setNodeDetails({});
+      setSelectedNode(null);
+      setIsPanelOpen(false);
     } catch (err) {
       console.error(err);
       alert("Error saving workflow");

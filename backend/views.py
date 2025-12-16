@@ -1,7 +1,7 @@
 import requests
 import json
 
-from django.db import transaction
+from django.db import transaction, IntegrityError
 from django.contrib.auth import authenticate, login, logout
 from django.shortcuts import get_object_or_404
 
@@ -125,18 +125,24 @@ class FetchAllWorkflowsView(APIView):
 
         serializer = CreateWorkflowSerializer(data=request.data)
         if not serializer.is_valid():
-            return Response({"error": "Invalid payload", "details": serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"Error": "Invalid payload", "details": serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
 
         data = serializer.validated_data
         workflow_name = data.get("workflow_name")
         nodes = data.get("nodes") or []
 
-        workflow = Workflow.objects.create(
-            workflow_name = workflow_name,
-            status = "pending",
-            root_template_id = 0,
-            is_active = True,
-        )
+        if Workflow.objects.filter(workflow_name=workflow_name).exists():
+            return Response({"Message": "Workflow Name already exists"}, status=status.HTTP_409_CONFLICT)
+
+        try:
+            workflow = Workflow.objects.create(
+                workflow_name = workflow_name,
+                status = "pending",
+                root_template_id = 0,
+                is_active = True,
+            )
+        except IntegrityError:
+            return Response({"Message": "Workflow Name already exists"}, status=status.HTTP_409_CONFLICT)
 
         template_map = {} # Template Instance
         mapping_map = {} #Workflowmapping Instance

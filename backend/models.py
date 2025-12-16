@@ -30,7 +30,7 @@ class Workflow(models.Model):
     ]
 
     workflow_id = models.AutoField(primary_key=True)
-    workflow_name = models.CharField(max_length=128)
+    workflow_name = models.CharField(max_length=128, unique=True)
     status = models.CharField(max_length=10, choices=STATUS_CHOICES)
     root_template_id = models.IntegerField()
     created_at = models.DateTimeField(auto_now_add=True)
