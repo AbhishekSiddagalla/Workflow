@@ -29,7 +29,6 @@ ALLOWED_HOSTS = ["127.0.0.1", "localhost", "testserver"]
 
 CORS_ALLOW_CREDENTIALS = True
 
-
 # Application definition
 
 INSTALLED_APPS = [

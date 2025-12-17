@@ -1,7 +1,15 @@
 from django.urls import path
 
-from backend.views import DashboardView, FetchAllWorkflowsView, SendWorkflowView, \
-    FetchWorkflowView, DeleteWorkflowView, FetchTemplatesView, SyncTemplatesView
+from backend.views import (
+    DashboardView,
+    FetchAllWorkflowsView,
+    SendWorkflowView,
+    FetchWorkflowView,
+    DeleteWorkflowView,
+    FetchTemplatesView,
+    SyncTemplatesView,
+
+)
 
 urlpatterns = [
     path("dashboard/", DashboardView.as_view(), name="dashboard"),
@@ -13,5 +21,5 @@ urlpatterns = [
     path("workflows/<int:id>/delete/",DeleteWorkflowView.as_view(), name="delete-workflow"),
 
     path("templates/", FetchTemplatesView.as_view(), name="fetch-templates"),
-    path("templates/sync/", SyncTemplatesView.as_view(), name="sync-templates")
+    path("templates/sync/", SyncTemplatesView.as_view(), name="sync-templates"),
 ]

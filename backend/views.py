@@ -16,7 +16,9 @@ from .models import User, Workflow, Templates, WorkflowMapping, APILog
 
 from .serializers import CreateWorkflowSerializer
 
-from backend.api_config import  api_access_token, api_version, whatsapp_business_account_id
+from backend.api_config import  api_access_token, api_version, whatsapp_business_account_id, to_phone_number
+
+from backend.services.whatsapp import send_whatsapp_template
 
 class LoginView(APIView):
     """
@@ -209,12 +211,43 @@ class FetchAllWorkflowsView(APIView):
 
 
 class SendWorkflowView(APIView):
-    def post(self, request):
-        return Response({"response": "Workflow sent successfully"}, status=200)
+    """
+    starts workflow by sending root node only
+    """
+    def post(self, request, w_id):
+        phone_number = request.data.get("phone_number")
+        if not phone_number:
+            return Response({"Error": "phone_number required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        workflow = get_object_or_404(Workflow, workflow_id=w_id, is_active=True)
+
+        root = workflow.mappings.filter(is_root=True, is_active=True).first()
+        if not root or not root.template:
+            return Response({"Error": "Root node not configured"}, status=status.HTTP_400_BAD_REQUEST)
+
+        payload, status_code, response_text = send_whatsapp_template(
+            phone_number = to_phone_number,
+            template_name = root.template.template_name,
+            components = root.template.template_params.get("components", [])
+        )
+
+        APILog.objects.create(
+            user = request.user if request.user.is_authenticated else None,
+            workflow = workflow,
+            node_id = root,
+            template = root.template,
+            request_payload = payload,
+            response_code = status_code,
+            response_message = response_text
+        )
+        return Response({
+            "response": "Workflow started",
+            "root_template": root.template.template_name
+        }, status=200)
 
 class FetchWorkflowView(APIView):
-    def get(self, request, id):
-        wf = get_object_or_404(Workflow, workflow_id=id)
+    def get(self, request, w_id):
+        wf = get_object_or_404(Workflow, workflow_id=w_id)
         mappings= wf.mappings.filter(is_active=True).order_by("template_sequence_order")
         data = {
             "workflow_id": wf.workflow_id,
@@ -235,12 +268,12 @@ class FetchWorkflowView(APIView):
 class UpdateWorkflowView(APIView):
     def put(self, request, id):
 
-        return Response({"response": f" updated successfully"},status=200)
+        return Response({"response": f" updated successfully"},status=status.HTTP_200_OK)
 
 class DeleteWorkflowView(APIView):
     def delete(self,request):
         workflow_name = None
-        return Response({"response": f"{workflow_name} deleted successfully"}, status=200)
+        return Response({"response": f"{workflow_name} deleted successfully"}, status=status.HTTP_200_OK)
 
 class FetchTemplatesView(APIView):
     # authentication_classes = []
@@ -255,8 +288,66 @@ class FetchTemplatesView(APIView):
         }
         response = requests.get(url, headers=headers)
         templates = response.json().get("data", [])
-        return Response({"response": "templates fetched successfully", "templates": templates}, status=200)
+        return Response({"response": "templates fetched successfully", "templates": templates}, status=status.HTTP_200_OK)
 
 class SyncTemplatesView(APIView):
     def post(self, request):
-        return Response({"response": "templates are synced"}, status=200)
+        return Response({"response": "templates are synced"}, status=status.HTTP_200_OK)
+
+class WhatsAppWebhookView(APIView):
+    def post(self, request):
+        entry = request.data.get("entry", [])[0]
+        changes = entry.get("changes",[])[0]
+        value = changes.get("value",{})
+        messages = value.get("messages",[])
+
+        if not messages:
+            return Response(status= status.HTTP_200_OK)
+
+        message = messages[0]
+        phone_number = message["from"]
+
+        button_reply = (
+            message.get("interactive", {})
+                   .get("buttons", {})
+        )
+
+        button_id = button_reply.get("id")
+        if not button_id:
+            return Response(status=status.HTTP_200_OK)
+
+        last_log = (
+            APILog.objects
+            .filter(workflow__is_active=True)
+            .order_by("-created_at")
+            .first()
+        )
+        if not last_log:
+            return Response(status=status.HTTP_200_OK)
+
+        current_node = last_log.node_id
+
+        next_node = current_node.child_mappings.filter(
+            condition_trigger = button_id,
+            is_active = True
+        ).first()
+
+        if not next_node or not next_node.template:
+            return Response(status=status.HTTP_200_OK)
+
+        payload, status_code, response_text = send_whatsapp_template(
+            phone_number = phone_number,
+            template_name = next_node.template.template_name,
+            components = next_node.template.template_params.get("components", [])
+        )
+
+        APILog.objects.create(
+            user = last_log.user,
+            workflow = last_log.workflow,
+            node_id = next_node,
+            template = next_node.template,
+            request_payload = payload,
+            response_code = status_code,
+            response_message = response_text
+        )
+        return Response(status=status.HTTP_200_OK)
