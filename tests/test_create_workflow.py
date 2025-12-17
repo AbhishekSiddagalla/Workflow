@@ -79,8 +79,8 @@ class TestCreateWorkflowPOST:
 
         assert response.status_code == 400
         res = response.json()
-        assert "error" in res
-        assert res["error"] == "Invalid payload"
+        assert "Error" in res
+        assert res["Error"] == "Invalid payload"
         assert "details" in res
 
     def test_template_and_mapping_creation_logic(self, test_user):
