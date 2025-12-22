@@ -2,7 +2,7 @@ import pytest
 from django.test import Client
 from django.urls import reverse
 
-from .fixtures import active_workflows
+from  tests.fixtures.fetch_all_workflows import active_workflows, mixed_workflows
 
 
 @pytest.mark.django_db

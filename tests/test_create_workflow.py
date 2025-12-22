@@ -4,7 +4,7 @@ from django.urls import reverse
 from django.test import Client
 from backend.models import Workflow, Templates, WorkflowMapping
 
-from .fixtures import test_user, valid_workflow_payload, empty_payload, missing_target_payload, malformed_payload
+from tests.fixtures.create_workflow import test_user, valid_workflow_payload, empty_payload, missing_target_payload, malformed_payload
 
 
 @pytest.mark.django_db(transaction=True)

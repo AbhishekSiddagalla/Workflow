@@ -227,12 +227,12 @@ class SendWorkflowView(APIView):
     """
     starts workflow by sending root node only
     """
-    def post(self, request, w_id):
+    def post(self, request, id):
         phone_number = request.data.get("phone_number")
         if not phone_number:
             return Response({"Error": "phone_number required"}, status=status.HTTP_400_BAD_REQUEST)
 
-        workflow = get_object_or_404(Workflow, workflow_id=w_id, is_active=True)
+        workflow = get_object_or_404(Workflow, workflow_id=id, is_active=True)
 
         root = workflow.mappings.filter(is_root=True, is_active=True).first()
         if not root or not root.template:
@@ -259,8 +259,8 @@ class SendWorkflowView(APIView):
         }, status=200)
 
 class FetchWorkflowView(APIView):
-    def get(self, request, w_id):
-        wf = get_object_or_404(Workflow, workflow_id=w_id)
+    def get(self, request, id):
+        wf = get_object_or_404(Workflow, workflow_id=id)
         mappings= wf.mappings.filter(is_active=True).order_by("template_sequence_order")
         data = {
             "workflow_id": wf.workflow_id,
@@ -346,7 +346,10 @@ class WhatsAppWebhookView(APIView):
         ).first()
 
         if not next_node or not next_node.template:
-            return Response(status=status.HTTP_200_OK)
+            return Response(
+                {"response": "Workflow ended"},
+                status=status.HTTP_200_OK
+            )
 
         payload, status_code, response_text = send_whatsapp_template(
             phone_number = phone_number,

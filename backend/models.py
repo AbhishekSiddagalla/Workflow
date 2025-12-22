@@ -74,7 +74,7 @@ class APILog(models.Model):
     Storing all workflows report
     """
     log_id = models.AutoField(primary_key=True)
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="logs")
+    user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name="logs")
     workflow = models.ForeignKey(Workflow, on_delete=models.CASCADE, related_name="logs")
     node_id = models.ForeignKey(WorkflowMapping, on_delete=models.CASCADE)
     template = models.ForeignKey(Templates, on_delete=models.CASCADE)
