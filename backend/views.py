@@ -91,15 +91,29 @@ class FetchAllWorkflowsView(APIView):
     authentication_classes = []
     permission_classes = []
     def get(self,request):
-        workflows = Workflow.objects.filter(is_active=True).order_by("-created_at")
-        data = [{
-            "workflow_id": w.workflow_id,
-            "workflow_name": w.workflow_name,
-            "status": w.status,
-            "created_by": w.created_by.username,
-            "created_at": w.created_at
-        } for w in workflows]
-        return Response({"response": "Workflows Fetched Successfully", "workflows": data}, status=status.HTTP_200_OK)
+        try:
+            workflows = Workflow.objects.filter(is_active=True).order_by("-created_at")
+            data = [{
+                "workflow_id": w.workflow_id,
+                "workflow_name": w.workflow_name,
+                "status": w.status,
+                "created_at": w.created_at
+            } for w in workflows]
+            return Response(
+                {
+                    "response": "Workflows Fetched Successfully",
+                    "workflows": data
+                },
+                status=status.HTTP_200_OK
+            )
+        except Exception as e:
+            return Response(
+                {
+                    "Error": "Failed to fetch workflows",
+                    "details": str(e)
+                },
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
     @transaction.atomic
     def post(self, request):
@@ -209,7 +223,6 @@ class FetchAllWorkflowsView(APIView):
             status = status.HTTP_200_OK
         )
 
-
 class SendWorkflowView(APIView):
     """
     starts workflow by sending root node only
@@ -306,7 +319,7 @@ class WhatsAppWebhookView(APIView):
 
         message = messages[0]
         phone_number = message["from"]
-
+ 
         button_reply = (
             message.get("interactive", {})
                    .get("buttons", {})

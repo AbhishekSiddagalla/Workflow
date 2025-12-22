@@ -30,9 +30,7 @@ class TestCreateWorkflowPOST:
         assert workflow.status == "pending"
 
         assert Templates.objects.filter(workflow=workflow).count() == len(valid_workflow_payload["nodes"])
-
         assert WorkflowMapping.objects.filter(workflow=workflow).count() == len(valid_workflow_payload["nodes"])
-
         assert workflow.root_template_id != 0
 
     def test_empty_nodes_payload(self, empty_payload):
