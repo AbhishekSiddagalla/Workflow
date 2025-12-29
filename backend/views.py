@@ -334,12 +334,11 @@ class UpdateWorkflowView(APIView):
 
         Templates.objects.filter(workflow=workflow).update(is_active=False)
 
-        template_map = {}
         mapping_map = {}
-
+        #create mappings
         for idx, node in enumerate(nodes):
             t_name = node.get("template_name")
-            payload = node.get("payload")
+            payload = node.get("template_payload")
             params = node.get("template_params") or {}
 
             template_obj = None
@@ -369,24 +368,33 @@ class UpdateWorkflowView(APIView):
 
             mapping_map[node["client_node_id"]] = mapping
 
+        #parent-child relationships
         for node in nodes:
             src = mapping_map.get(node["client_node_id"])
             for btn in node.get("buttons", []):
-                tgt = mapping_map.get(btn.get("next_client_node_id"))
+                tgt = mapping_map.get(btn.get("next_node_client_id"))
                 if tgt:
                     tgt.parent_mapping = src
                     tgt.condition_trigger = btn.get("id")
                     tgt.save()
 
-            for m in mapping_map.values():
-                if not m.parent_mapping:
-                    m.is_root = True
-                    m.save()
-                    if m.template:
-                        workflow.root_template_id = m.template.template_id
+        #root detection
+        WorkflowMapping.objects.filter(workflow = workflow, is_active = True).update(is_root = False)
 
-            workflow.save()
-        return Response({"response": f" updated successfully"},status=status.HTTP_200_OK)
+        root = (
+            WorkflowMapping.objects
+            .filter(workflow = workflow, is_active = True, parent_mapping__isnull = True)
+            .first()
+        )
+        if root:
+            root.is_root = True
+            root.save()
+
+            if root.template:
+                workflow.root_template_id = root.template.template_id
+
+        workflow.save()
+        return Response({"response": f"workflow updated successfully"},status=status.HTTP_200_OK)
 
 class DeleteWorkflowView(APIView):
     def delete(self,request):
