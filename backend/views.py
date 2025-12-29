@@ -49,7 +49,6 @@ class LoginView(APIView):
             return Response({"error": "internal server error", "details": str(e)},
                             status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-
 class LogoutView(APIView):
 
     def post(self, request):
@@ -66,7 +65,6 @@ class LogoutView(APIView):
 
         except Exception as e:
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
 
 class RefreshTokenView(APIView):
     def post(self, request):
@@ -258,6 +256,48 @@ class SendWorkflowView(APIView):
             "root_template": root.template.template_name
         }, status=200)
 
+class FetchWorkflowForEditView(APIView):
+    def get(self, request, id):
+        workflow = get_object_or_404(Workflow, workflow_id = id, is_active = True)
+        mappings = (
+            workflow.mappings
+            .select_related("template", "parent_mappings")
+            .filter(is_active = True)
+            .order_by("template_sequence_order")
+        )
+
+        nodes = []
+        edges = []
+
+        for mapping in mappings:
+            nodes.append({
+                "id": f"n{mapping.id}",
+                "position": mapping.template_params.get("position", {"x": 250, "y": 250}),
+                "data": {
+                    "label": mapping.template.template_name if mapping.template else "Node",
+                },
+                "template": {
+                    "template_name": mapping.template.template_name if mapping.template else None,
+                    "payload": mapping.template.template_content if mapping.template else None,
+                    "params": mapping.template.template_params if mapping.template else {},
+                },
+            })
+
+            if mapping.parent_mapping:
+                edges.append({
+                    "id": f"e{mapping.parent_mapping.id} - {mapping.id}",
+                    "source": f"n{mapping.parent_mapping.id}",
+                    "target": f"n{mapping.id}",
+                    "type": "smoothstep",
+                })
+
+        return Response({
+            "workflow_id": workflow.workflow_id,
+            "workflow_name": workflow.workflow_name,
+            "nodes": nodes,
+            "edges": edges,
+        }, status=status.HTTP_200_OK)
+
 class FetchWorkflowView(APIView):
     def get(self, request, id):
         wf = get_object_or_404(Workflow, workflow_id=id)
@@ -279,8 +319,73 @@ class FetchWorkflowView(APIView):
         return Response({"response": f"Fetched", "workflow": data}, status=status.HTTP_200_OK)
 
 class UpdateWorkflowView(APIView):
+    @transaction.atomic
     def put(self, request, id):
+        workflow = get_object_or_404(Workflow, workflow_id = id, is_active = True)
 
+        serializer = CreateWorkflowSerializer(data = request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status = status.HTTP_400_BAD_REQUEST)
+
+        data = serializer.validated_data
+        nodes = data.get("nodes", [])
+
+        workflow.mappings.update(is_active=False) #deactivating old mappings
+
+        Templates.objects.filter(workflow=workflow).update(is_active=False)
+
+        template_map = {}
+        mapping_map = {}
+
+        for idx, node in enumerate(nodes):
+            t_name = node.get("template_name")
+            payload = node.get("payload")
+            params = node.get("template_params") or {}
+
+            template_obj = None
+            if t_name:
+                template_obj = Templates.objects.create(
+                    workflow = workflow,
+                    template_name = t_name,
+                    template_category = "imported",
+                    template_content = json.dumps(payload) if payload else "",
+                    template_params = params,
+                    template_status = "Imported",
+                    is_active = True
+                )
+
+            mapping = WorkflowMapping.objects.create(
+                workflow = workflow,
+                template = template_obj,
+                parent_mapping = None,
+                is_root = False,
+                template_sequence_order = node.get("order", idx + 1),
+                template_params = {
+                    **params,
+                    "position": node.get("position"),
+                },
+                is_active = True
+            )
+
+            mapping_map[node["client_node_id"]] = mapping
+
+        for node in nodes:
+            src = mapping_map.get(node["client_node_id"])
+            for btn in node.get("buttons", []):
+                tgt = mapping_map.get(btn.get("next_client_node_id"))
+                if tgt:
+                    tgt.parent_mapping = src
+                    tgt.condition_trigger = btn.get("id")
+                    tgt.save()
+
+            for m in mapping_map.values():
+                if not m.parent_mapping:
+                    m.is_root = True
+                    m.save()
+                    if m.template:
+                        workflow.root_template_id = m.template.template_id
+
+            workflow.save()
         return Response({"response": f" updated successfully"},status=status.HTTP_200_OK)
 
 class DeleteWorkflowView(APIView):
