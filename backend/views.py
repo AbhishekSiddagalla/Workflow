@@ -148,6 +148,10 @@ class FetchAllWorkflowsView(APIView):
         if Workflow.objects.filter(workflow_name=workflow_name).exists():
             return Response({"Message": "Workflow Name already exists"}, status=status.HTTP_409_CONFLICT)
 
+        client_ids = [ n.get("client_node_id") for n in nodes if n.get("client_node_id")]
+        if len(client_ids) != len(set(client_ids)):
+            return Response({"Error": "Duplicate client_node_id detected"}, status=status.HTTP_400_BAD_REQUEST)
+
         try:
             workflow = Workflow.objects.create(
                 workflow_name = workflow_name,
@@ -194,27 +198,42 @@ class FetchAllWorkflowsView(APIView):
             client_id = node.get("client_node_id")
             if client_id: mapping_map[client_id] = mapping
 
+        valid_client_ids = set(mapping_map.keys())
+
         for node in nodes:
-            source_client_id = node.get("client_node_id")
-            source_mapping = mapping_map.get(source_client_id)
-            buttons = node.get("buttons") or []
-            for button in buttons:
-                next_client_id = button.get("next_node_client_id")
-                if next_client_id:
-                    target_mapping = mapping_map.get(next_client_id)
-                    if target_mapping:
-                        if target_mapping.parent_mapping is None:
-                            target_mapping.parent_mapping = source_mapping
-                            target_mapping.save()
+            for btn in node.get("buttons", []):
+                target_id = btn.get("next_node_client_id")
+                if target_id and target_id not in valid_client_ids:
+                    return Response(
+                        {"Error": "Button target node does not exist"},
+                        status = status.HTTP_400_BAD_REQUEST,
+                    )
 
-        for client_id, mapping in mapping_map.items():
-            if mapping.parent_mapping is None:
-                mapping.is_root = True
-                mapping.save()
+        for node in nodes:
+            src = mapping_map.get(node.get("client_node_id"))
+            for btn in node.get("buttons", []):
+                tgt = mapping_map.get(btn.get("next_node_client_id"))
+                if tgt and tgt.parent_mapping is None:
+                    tgt.parent_mapping = src
+                    tgt.condition_trigger = btn.get("id")
+                    tgt.save()
 
-                if workflow.root_template_id == 0 and mapping.template:
-                    workflow.root_template_id = mapping.template.template_id
-                    workflow.save()
+        WorkflowMapping.objects.filter(
+            workflow=workflow, is_active=True
+        ).update(is_root=False)
+
+        roots = [
+            m for m in mapping_map.values() if m.parent_mapping is None
+        ]
+
+        if roots:
+            root = roots[0]
+            root.is_root = True
+            root.save()
+
+            if root.template:
+                workflow.root_template_id = root.template.template_id
+                workflow.save()
 
         return Response(
             {"response": "workflow created successfully", "workflow_id": workflow.workflow_id},
