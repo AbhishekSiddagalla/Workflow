@@ -251,7 +251,11 @@ class SendWorkflowView(APIView):
 
         workflow = get_object_or_404(Workflow, workflow_id=id, is_active=True)
 
-        root = workflow.mappings.filter(is_root=True, is_active=True).first()
+        root = (
+            workflow.mappings
+            .filter(is_root=True, is_active=True)
+            .first()
+        )
         if not root or not root.template:
             return Response({"Error": "Root node not configured"}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -416,8 +420,11 @@ class UpdateWorkflowView(APIView):
         return Response({"response": f"workflow updated successfully"},status=status.HTTP_200_OK)
 
 class DeleteWorkflowView(APIView):
-    def delete(self,request):
-        workflow_name = None
+    def delete(self, request, id):
+        workflow = get_object_or_404(Workflow, workflow_id = id)
+
+        workflow_name = workflow.workflow_name
+        workflow.delete()
         return Response({"response": f"{workflow_name} deleted successfully"}, status=status.HTTP_200_OK)
 
 class FetchTemplatesView(APIView):
