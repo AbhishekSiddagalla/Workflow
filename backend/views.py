@@ -261,7 +261,7 @@ class FetchWorkflowForEditView(APIView):
         workflow = get_object_or_404(Workflow, workflow_id = id, is_active = True)
         mappings = (
             workflow.mappings
-            .select_related("template", "parent_mappings")
+            .select_related("template", "parent_mapping")
             .filter(is_active = True)
             .order_by("template_sequence_order")
         )

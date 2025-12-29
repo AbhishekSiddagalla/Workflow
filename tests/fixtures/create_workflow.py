@@ -1,5 +1,5 @@
 import pytest
-from backend.models import User, Workflow
+from backend.models import User
 
 
 @pytest.fixture
